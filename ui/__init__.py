@@ -1,8 +1,10 @@
+import bpy
 import os
 import shutil
 from pathlib import Path
 
 from . import properties_panels
+from . import popup
 from .properties_panels import collider_presets_folder
 
 classes = (
@@ -15,6 +17,7 @@ classes = (
     properties_panels.VIEW3D_PT_collision_visibility_panel,
     properties_panels.VIEW3D_PT_collision_material_panel,
     properties_panels.VIEW3D_MT_PIE_template,
+    popup.VIEW3_PT_console_popup,
 )
 
 
@@ -40,6 +43,10 @@ def initialize_presets():
 
 
 def register():
+    bpy.types.Scene.show_outputs = bpy.props.BoolProperty(name="Show outputs", default=True)
+    bpy.types.Scene.show_errors = bpy.props.BoolProperty(name="Show errors", default=True)
+    bpy.types.Scene.console_thief = bpy.props.BoolProperty(name="Show Console", default=True)
+
     from bpy.utils import register_class
 
     for cls in classes:
@@ -53,3 +60,7 @@ def unregister():
 
     for cls in reversed(classes):
         unregister_class(cls)
+
+    del bpy.types.Scene.show_outputs
+    del bpy.types.Scene.show_errors
+    del bpy.types.Scene.console_thief

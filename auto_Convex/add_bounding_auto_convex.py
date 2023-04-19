@@ -115,6 +115,10 @@ class VHACD_OT_convex_decomposition(OBJECT_OT_add_bounding_object, Operator):
         return {'CANCELLED'}
 
     def execute(self, context):
+        # Call popup
+        # bpy.ops.wm.call_panel(name="VIEW3_PT_console_popup", keep_open=True)
+        bpy.ops.wm.console_toggle(True)
+
         # CLEANUP
         super().execute(context)
 
@@ -331,5 +335,7 @@ class VHACD_OT_convex_decomposition(OBJECT_OT_add_bounding_object, Operator):
         super().print_generation_time("Auto Convex Colliders", elapsed_time)
         self.report({'INFO'}, "Auto Convex Colliders: " +
                     str(float(elapsed_time)))
+
+        bpy.ops.wm.console_toggle(False)
 
         return {'FINISHED'}
