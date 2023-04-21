@@ -45,7 +45,7 @@ def initialize_presets():
 def register():
     bpy.types.Scene.show_outputs = bpy.props.BoolProperty(name="Show outputs", default=True)
     bpy.types.Scene.show_errors = bpy.props.BoolProperty(name="Show errors", default=True)
-    bpy.types.Scene.console_thief = bpy.props.BoolProperty(name="Show Console", default=True)
+    # bpy.types.Scene.console_thief = bpy.props.BoolProperty(name="Show Console", default=True)
 
     from bpy.utils import register_class
 

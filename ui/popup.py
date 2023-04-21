@@ -48,27 +48,6 @@ def organizeMessage(inp):
     return out
 
 
-# class ClearConsoleOperator(bpy.types.Operator):
-#     bl_idname = "console_output.clear"
-#     bl_label = "Clears the Console."
-#
-#     def execute(self, context):
-#         if isinstance(sys.stdout, Thief):
-#             sys.stdout = Thief(sys.stdout.source)
-#         else:
-#             sys.stdout = Thief(sys.stdout)
-#
-#         if isinstance(sys.stderr, Thief):
-#             sys.stderr = Thief(sys.stderr.source)
-#         else:
-#             sys.stderr = Thief(sys.stderr)
-#
-#         # sys.stdout = Thief()
-#         # sys.stderr = Thief()
-#
-#         return {"FINISHED"}
-
-
 class VIEW3_PT_console_popup(bpy.types.Panel):
     """Tooltip"""
     bl_idname = "VIEW3_PT_console_popup"
@@ -83,61 +62,34 @@ class VIEW3_PT_console_popup(bpy.types.Panel):
         row = layout.row()
 
         col = row.column()
+        col.label(text=";asdkfja;sdlfkj;asdlkfj;aslkdf j;lkasdjf; kjasd lkad sj;f lkajds;lksd j;alkj dsf;lksadj f;")
 
-        col.prop(scene, "console_thief", text="Display Console output")
+        from datetime import datetime
+        now = datetime.now()
 
-        if scene.console_thief:
-            if not isinstance(sys.stdout, Thief):
-                sys.stdout = Thief(sys.stdout)
-
-            if not isinstance(sys.stderr, Thief):
-                sys.stderr = Thief(sys.stderr)
-        else:
-            if isinstance(sys.stdout, Thief):
-                sys.stdout = sys.stdout.source
-
-            if isinstance(sys.stderr, Thief):
-                sys.stderr = sys.stderr.source
-            return
+        current_time = now.strftime("%H:%M:%S")
+        col.label(text=f"Current Time = {current_time}")
+        # if not isinstance(sys.stdout, Thief):
+        #     sys.stdout = Thief(sys.stdout)
+        # else:
+        #     if isinstance(sys.stdout, Thief):
+        #         sys.stdout = sys.stdout.source
 
         col.separator()
 
-        col.prop(scene, "show_outputs", text="Show Debug outputs")
-        col.prop(scene, "show_errors", text="Show Errors")
-
-        # col.operator("console_output.clear", text="Clear Console Outputs", icon="FILE_REFRESH")
-
-        col.separator()
+        # col.prop(scene, "show_outputs", text="Show Debug outputs")
+        # col.prop(scene, "show_errors", text="Show Errors")
 
         # Prints
-        if scene.show_outputs:
-            val = organizeMessage(sys.stdout.getvalue())
+        values = sys.stdout.getvalue()
+        val = organizeMessage(values)
 
-            if len(val) > 0:
-                if not isinstance(val[0], int):
-                    box = col.box()
-                    box.label(text="Output:", icon="TEXT")
-                for obj in val:
-                    if isinstance(obj, int):
-                        box = col.box()
-                        box.label(text="(" + str(obj) + ") Outputs:", icon="TEXT")
-                    else:
-                        box.label(text=obj)
-            else:
+
+        if len(val) > 0:
+            box = col.box()
+            for output in val:
+                box.label(text=output)
+        else:
                 col.label(text="No Debug output to show")
 
-        if scene.show_errors:
-            val = organizeMessage(sys.stderr.getvalue())
-
-            if len(val) > 0:
-                if not isinstance(val[0], int):
-                    box = col.box()
-                    box.label(text="Error:", icon="CANCEL")
-                for obj in val:
-                    if isinstance(obj, int):
-                        box = col.box()
-                        box.label(text="(" + str(obj) + ") Errors:", icon="CANCEL")
-                    else:
-                        box.label(text=obj)
-            else:
-                col.label(text="No error to show")
+        col.operator("console_output.clear", text="Clear Console Outputs", icon="FILE_REFRESH")
