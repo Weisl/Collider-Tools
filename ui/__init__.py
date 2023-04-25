@@ -10,6 +10,7 @@ from .properties_panels import collider_presets_folder
 classes = (
     properties_panels.EXPLORER_OT_open_directory,
     properties_panels.PREFERENCES_OT_open_addon,
+    properties_panels.BUTTON_OT_auto_convex,
     properties_panels.OBJECT_MT_collision_presets,
     properties_panels.VIEW3D_MT_collision_creation,
     properties_panels.VIEW3D_PT_collision_panel,
@@ -18,6 +19,7 @@ classes = (
     properties_panels.VIEW3D_PT_collision_material_panel,
     properties_panels.VIEW3D_MT_PIE_template,
     popup.VIEW3_PT_console_popup,
+    popup.VIEW3D_PT_auto_convex_popup,
 )
 
 

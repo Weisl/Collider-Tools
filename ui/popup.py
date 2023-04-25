@@ -1,10 +1,7 @@
-# Console Output Display Add-on.
-# Created by: Guilherme Teres Nunes
-# Visit: youtube.com/UnidayStudio
-
 import bpy
 import sys
 import io
+from .properties_panels import draw_auto_convex_settings
 
 
 class Thief(io.StringIO):
@@ -93,3 +90,21 @@ class VIEW3_PT_console_popup(bpy.types.Panel):
                 col.label(text="No Debug output to show")
 
         col.operator("console_output.clear", text="Clear Console Outputs", icon="FILE_REFRESH")
+
+class VIEW3D_PT_auto_convex_popup(bpy.types.Panel):
+    """Tooltip"""
+    bl_idname = "POPUP_PT_auto_convex"
+    bl_label = "Renaming Info"
+    bl_space_type = "VIEW_3D"
+    bl_region_type = "WINDOW"
+
+    def draw(self, context):
+
+        layout = self.layout
+
+        colSettings = context.scene.collider_tools
+        draw_auto_convex_settings(colSettings, layout)
+
+        layout.operator("collision.vhacd", text="Auto Convex", icon='MESH_ICOSPHERE')
+
+        return
