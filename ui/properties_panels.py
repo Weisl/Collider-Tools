@@ -5,6 +5,7 @@ import subprocess
 import textwrap
 from bpy.types import Menu
 
+from ..pyshics_materials.material_functions import create_default_material, set_active_physics_material
 
 def collider_presets_folder():
     # Make sure there is a directory for presets
@@ -48,7 +49,7 @@ def draw_auto_convex(layout, context):
 
         if prefs.executable_path or prefs.default_executable_path:
 
-            layout.operator("button.auto_convex", text="Auto Convex", icon='MESH_ICOSPHERE')
+            layout.operator("button.auto_convex", text="Auto Convex", icon='WINDOW')
             op = layout.operator("preferences.addon_search", text="", icon='PREFERENCES')
             op.addon_name = addon_name
             op.prefs_tabs = 'VHACD'
@@ -67,7 +68,6 @@ def draw_auto_convex_settings(colSettings, layout):
     row.prop(colSettings, 'maxHullVertCount')
     row = col.row(align=True)
     row.prop(colSettings, 'voxelResolution')
-
 
 
 def label_multiline(context, text, parent):
@@ -154,7 +154,10 @@ def draw_creation_menu(context, layout, settings=False):
     # layout.separator()
     col =layout.column(align=True)
     row = col.row(align=True)
+    row.operator("mesh.add_bounding_capsule", icon='MESH_CAPSULE')
+    row = col.row(align=True)
     row.operator("mesh.add_minimum_bounding_box", icon='MESH_CUBE')
+
 
     # layout.separator()
     row = col.row(align=True)
@@ -167,7 +170,7 @@ def draw_creation_menu(context, layout, settings=False):
     row = col.row(align=True)
     row.operator('object.convert_to_collider', icon='PHYSICS')
     row = col.row(align=True)
-    row.operator('object.convert_to_mesh', icon='MESH_MONKEY')
+    row.operator('object.convert_to_mesh', icon='WINDOW')
 
     row = layout.row(align=True)
     row.operator('object.regenerate_name', icon='FILE_REFRESH')
@@ -186,6 +189,7 @@ def draw_creation_menu(context, layout, settings=False):
     row.label(text='Display as')
     row.prop(colSettings, 'display_type', text='')
     row.prop(colSettings, 'toggle_wireframe', text='', icon='SHADING_WIRE')
+
 
 def draw_naming_presets(self, context):
     layout = self.layout
@@ -206,7 +210,7 @@ def draw_naming_presets(self, context):
 
 ############## OPERATORS ##############################
 
-class EXPLORER_OT_open_directory(bpy.types.Operator):
+class EXPLORER_OT_open_directory_new(bpy.types.Operator):
     """Open render output directory in Explorer"""
     bl_idname = "explorer.open_in_explorer"
     bl_label = "Open Folder"
@@ -411,20 +415,25 @@ class VIEW3D_PT_collision_material_panel(VIEW3D_PT_collision):
         colSettings = context.scene.collider_tools
         prefs = context.preferences.addons[__package__.split('.')[0]].preferences
 
-        if not prefs.use_physics_material:
-            layout.active = False
-            self.draw_active_physics_material(colSettings, layout)
-            layout.active = True
+        layout.label(text='Active Material')
+        # self.draw_active_physics_material(colSettings, layout)
+        scene = context.scene
+        activeMat = scene.active_physics_material
 
-        else:
-            self.draw_active_physics_material(colSettings, layout)
+        split_left = layout.split(factor=0.75, align=True)
+        col_01 = split_left.column(align=True)
+        col_02 = split_left.column(align=True)
+
+        col_01.prop_search(scene, "active_physics_material", bpy.data, "materials", text='')
+        col_02.prop(activeMat, 'diffuse_color', text='')
+
+        if prefs.use_physics_material:
+            layout.label(text='Material List')
             layout.template_list("MATERIAL_UL_physics_materials", "", bpy.data, "materials", colSettings,
                               "material_list_index")
 
             box = layout.box()
             col = box.column(align=True)
-            scene = context.scene
-            # col.prop(scene, "use_random_color")
             col.operator('material.create_physics_material', icon='ADD', text="Add Physics Material")
 
     def draw_active_physics_material(self, colSettings, layout):
@@ -505,6 +514,14 @@ class BUTTON_OT_auto_convex(bpy.types.Operator):
     """Print object name in Console"""
     bl_idname = "button.auto_convex"
     bl_label = "Auto Convex"
+
+    @classmethod
+    def poll(cls, context):
+        count = 0
+        for obj in context.selected_objects:
+            if obj.type == 'MESH':
+                count = count + 1
+        return count > 0
 
     def execute(self, context):
         bpy.ops.wm.call_panel(name="POPUP_PT_auto_convex")

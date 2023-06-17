@@ -342,6 +342,8 @@ class CollisionAddonPrefs(bpy.types.AddonPreferences):
                                         description='Naming used to define box colliders')
     sphere_shape: bpy.props.StringProperty(name="Sphere Collision", default="USP",
                                            description='Naming used to define sphere colliders')
+    capsule_shape: bpy.props.StringProperty(name="Capsule Collision", default="UCP",
+                                       description='Naming used to define capsule colliders')
     convex_shape: bpy.props.StringProperty(name="Convex Collision", default="UCX",
                                            description='Naming used to define convex colliders')
     mesh_shape: bpy.props.StringProperty(name="Mesh Collision", default="",
@@ -418,6 +420,15 @@ class CollisionAddonPrefs(bpy.types.AddonPreferences):
     user_group_03_color: bpy.props.FloatVectorProperty(name="User Group 3 Color",
                                                        description="Object color and alpha for User Collider Group 03.",
                                                        default=(1, 0.36, 0.36, 0.25), min=0.0, max=1.0, subtype='COLOR',
+                                                       size=4)
+
+    # Modal Box
+    use_modal_box: bpy.props.BoolProperty(name="Use Backdrop", default=True)
+
+
+    modal_box_color: bpy.props.FloatVectorProperty(name="Backdrop Color",
+                                                       description="Object color and alpha for User Collider Group 03.",
+                                                       default=(0.2, 0.2, 0.2, 0.5), min=0.0, max=1.0, subtype='COLOR',
                                                        size=4)
 
     # Modal Fonts
@@ -546,6 +557,7 @@ class CollisionAddonPrefs(bpy.types.AddonPreferences):
     props_shapes = [
         "box_shape",
         "sphere_shape",
+        "capsule_shape",
         "convex_shape",
         "mesh_shape",
     ]
@@ -590,6 +602,8 @@ class CollisionAddonPrefs(bpy.types.AddonPreferences):
 
     ui_props = [
         "modal_font_size",
+        "use_modal_box",
+        "modal_box_color",
         "modal_color_title",
         "modal_color_highlight",
         "modal_color_error",

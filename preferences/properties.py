@@ -1,6 +1,5 @@
 import bpy
 from ..groups import user_groups
-from ..pyshics_materials import material_functions
 
 
 def update_display_colliders(self, context):
@@ -8,24 +7,6 @@ def update_display_colliders(self, context):
     for obj in bpy.data.objects:
         if obj.get('isCollider'):
             obj.display_type = self.display_type
-
-
-def get_int(self):
-    if not self.on_load and self.get("material_list_index"):
-        return self.get("material_list_index")
-
-    prefs = bpy.context.preferences.addons[__package__.split('.')[0]].preferences
-    default_mat_name = prefs.physics_material_name
-  
-    mat = bpy.data.materials.get(default_mat_name, material_functions.create_default_material())
-
-    self["material_list_index"] = list(bpy.data.materials).index(mat)
-    self['on_load'] = False
-    return self["material_list_index"]
-
-
-def set_int(self, value):
-    self["material_list_index"] = value
 
 
 def update_wireframe(self, context):
@@ -149,6 +130,11 @@ class ColliderTools_Properties(bpy.types.PropertyGroup):
                                                    default=16,
                                                    )
 
+    default_capsule_segments: bpy.props.IntProperty(name="Capsule Segments",
+                                                   description="Amount of sphere segments.",
+                                                   default=16,
+                                                   )
+
     default_color_type: bpy.props.EnumProperty(name="Color Type",
                                          items=(('OBJECT', 'Collider Groups', 'Color Type: Collider Groups'),
                                                 ('MATERIAL', 'Physics Material', 'Color Type: Physic Materials'),
@@ -156,14 +142,11 @@ class ColliderTools_Properties(bpy.types.PropertyGroup):
                                          description="Set Color Type",
                                          default='OBJECT')
 
-    on_load: bpy.props.BoolProperty(name='On Load',
-                                    default=True)
-
     material_list_index: bpy.props.IntProperty(name="Index for material list",
                                                min=0,
                                                default=0,
-                                               get=get_int,
-                                               set=set_int,
+                                               # get=get_int,
+                                               # set=set_int,
                                                )
 
     # register variables saved in the blender scene
@@ -172,3 +155,4 @@ class ColliderTools_Properties(bpy.types.PropertyGroup):
         name='Default Mesh Material',
         description='The default mesh material will be assigned to any mesh that is converted from a collider to a mesh object'
     )
+
