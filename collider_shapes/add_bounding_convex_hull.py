@@ -1,6 +1,5 @@
 import bmesh
 import bpy
-import numpy as np
 from bpy.types import Operator
 
 from .add_bounding_primitive import OBJECT_OT_add_bounding_object

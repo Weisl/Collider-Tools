@@ -1,6 +1,5 @@
 import bpy
 import bmesh
-import random
 
 def create_material(name, diffuse, fakeUser=True):
     '''Create a materials if none with the specified name already exists'''

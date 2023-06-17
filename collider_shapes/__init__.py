@@ -1,5 +1,3 @@
-import bpy
-
 from . import add_bounding_box
 from . import add_bounding_convex_hull
 from . import add_bounding_cylinder

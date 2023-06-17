@@ -1,7 +1,7 @@
 import bpy
 import numpy as np
 
-from math import sqrt, radians
+from math import radians
 
 from bpy.types import Operator
 from mathutils import Matrix, Vector

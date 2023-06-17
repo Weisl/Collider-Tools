@@ -5,8 +5,6 @@ import subprocess
 import textwrap
 from bpy.types import Menu
 
-from ..pyshics_materials.material_functions import create_default_material, set_active_physics_material
-
 def collider_presets_folder():
     # Make sure there is a directory for presets
     collider_presets = "collider_tools"
