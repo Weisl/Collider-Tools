@@ -41,4 +41,5 @@ paths_exclude_pattern = [
     "/.github/",
     "/CHANGELOG.md",
     "/MANUAL_QA_CHECKLIST.md",
+    "/RESEARCH_NOTES.md",
 ]
