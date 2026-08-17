@@ -11,7 +11,18 @@ are added as a new section above the previous one — existing entries are
 never overwritten, so this file (like the docs page) accumulates the full
 release history over time.
 
-## Simple Collider v1.2.0 (Unreleased)
+## Simple Collider v1.2.1 (Unreleased)
+
+Minor bug fix release.
+
+### Bug Fixes
+
+- [#674](https://github.com/Weisl/simple_collider/issues/674): Fixed a crash
+  when creating a collider from a curve, text, or metaball object with
+  "Use Modifier Stack" disabled (the default) —
+  `AttributeError: 'Curve' object has no attribute 'update'`.
+
+## Simple Collider v1.2.0 (2026-08-04)
 
 This release adds scene-wide collider validation and an alternative
 CoACD-based Auto Convex backend, alongside a round of responsiveness and
