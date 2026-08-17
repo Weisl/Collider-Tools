@@ -660,7 +660,7 @@ def draw_async_job_overlay(self, context):
     lines.append((f'{elapsed:0.0f}S ELAPSED', font_size, prefs.modal_color_default))
     if hint:
         lines.append((hint.upper(), font_size, prefs.modal_color_navigation))
-    lines.append(('ESC TO CANCEL', font_size, prefs.modal_color_navigation))
+    lines.append(('ESC TO CANCEL', font_size, prefs.modal_color_error))
 
     line_height = int(font_size * 1.6)
     row_padding = font_size * 0.7
