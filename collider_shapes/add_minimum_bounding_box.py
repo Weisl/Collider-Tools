@@ -87,10 +87,11 @@ class OBJECT_OT_add_aligned_bounding_box(OBJECT_OT_add_bounding_object, Operator
 
         bb_basis, bb_max, bb_min = cls.rotating_calipers(chull_points, bases)
         bm.free()
-        bb_basis_mat = bb_basis.T
 
         if bb_min is None or bb_max is None:
             return None, None
+
+        bb_basis_mat = bb_basis.T
 
         bb_dim = bb_max - bb_min
         bb_center = (bb_max + bb_min) / 2
@@ -229,13 +230,24 @@ class OBJECT_OT_add_aligned_bounding_box(OBJECT_OT_add_bounding_object, Operator
             root_collection = context.scene.collection
             root_collection.objects.link(temp_obj)
 
-            self.apply_transform(temp_obj, rotation=True, scale=True)
+            try:
+                self.apply_transform(temp_obj, rotation=True, scale=True)
+                new_collider, rotation_matrix = self.obj_rotating_calipers(temp_obj)
+            finally:
+                # temp_obj/me are only a scratch mesh for obj_rotating_calipers - unlinking
+                # alone leaves them as orphan data-blocks forever (they were leaking on every
+                # call, see issue #673), so remove them outright once it has run.
+                root_collection.objects.unlink(temp_obj)
+                bpy.data.objects.remove(temp_obj)
+                bpy.data.meshes.remove(me)
 
-            new_collider, rotation_matrix = self.obj_rotating_calipers(temp_obj)
+            if new_collider is None:
+                # obj_rotating_calipers found no triangular convex-hull face to build an
+                # orientation basis from (e.g. a degenerate/flat island) - skip this island
+                # instead of crashing on objects.link(None) below.
+                self.report({'WARNING'}, f"Could not compute a minimum bounding box for '{parent.name}', skipped")
+                continue
 
-            root_collection.objects.unlink(temp_obj)
-
-            root_collection = context.scene.collection
             root_collection.objects.link(new_collider)
 
             self.custom_set_parent(context, parent, new_collider)
