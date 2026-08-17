@@ -21,6 +21,11 @@ Minor bug fix release.
   when creating a collider from a curve, text, or metaball object with
   "Use Modifier Stack" disabled (the default) —
   `AttributeError: 'Curve' object has no attribute 'update'`.
+- [#673](https://github.com/Weisl/simple_collider/issues/673): Fixed the
+  Oriented Minimum BBox collider crashing on degenerate/flat geometry with no
+  triangular convex-hull face to orient from (now skips that island with a
+  warning instead), and fixed its scratch mesh/object leaking as orphan
+  data-blocks on every use.
 
 ## Simple Collider v1.2.0 (2026-08-04)
 
