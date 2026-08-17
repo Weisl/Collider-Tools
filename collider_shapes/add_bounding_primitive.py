@@ -1802,9 +1802,15 @@ class OBJECT_OT_add_bounding_object():
                 bm.to_mesh(me)
                 bm.free()
             else:
-                # Create mesh from base data without applying modifiers
-                me = object.data.copy()
-                me.update()
+                # Create mesh from undeformed (no modifiers applied) geometry.
+                # object.data is not itself a Mesh for non-MESH types (CURVE/
+                # SURFACE/FONT/META - the only types convert_to_mesh() is ever
+                # called for, see get_pre_processed_mesh_objs()), so it can't
+                # just be copied like a mesh's data can - new_from_object()
+                # does the actual curve/surface/font/meta -> mesh conversion.
+                # Passing no depsgraph is what gives the undeformed geometry
+                # (see its docstring), mirroring the evaluated call above.
+                me = bpy.data.meshes.new_from_object(object)
 
             self.restore_obj_mod_from_dic(mods)
 

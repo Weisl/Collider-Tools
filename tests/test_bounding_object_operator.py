@@ -236,6 +236,171 @@ class TestApplyModifiersGuard(unittest.TestCase):
         )
 
 
+# -- convert_to_mesh: non-MESH source objects (#curve-crash regression) ------
+
+
+class _ConvertToMeshSpy(_OBJECT_OT_add_bounding_object):
+    """Minimal instance for exercising convert_to_mesh() directly.
+
+    convert_to_mesh() is a plain instance method (not static/classmethod), so
+    it needs a real `self` - but running the actual modal operator's
+    __init__ requires a live invoke() context this test doesn't have.
+    Subclassing OBJECT_OT_add_bounding_object gets the real
+    add_to_collections/create_collection/store_obj_mod_in_dic/
+    restore_obj_mod_from_dic collaborators for free while __init__ is
+    overridden to set only the handful of attributes convert_to_mesh()
+    itself reads.
+    """
+
+    def __init__(self):
+        self._modifier_bake_cache = {}
+        self.prefs = _types.SimpleNamespace(col_tmp_collection_color='NONE')
+
+
+class TestConvertToMeshNonMeshTypes(unittest.TestCase):
+    """Regression guard: convert_to_mesh() must handle non-MESH source
+    objects (CURVE/SURFACE/FONT/META - see VALID_OBJECT_TYPES) without
+    raising, for both use_modifiers=True and use_modifiers=False.
+
+    get_pre_processed_mesh_objs() only ever routes non-MESH objects through
+    convert_to_mesh() (MESH objects take a separate `obj.data.copy()`
+    branch), so every collider-creation operator (Box, Convex Hull, Mesh
+    Collision, ...) run on a curve/text/metaball object depends on this.
+
+    Regression: the use_modifiers=False branch used to do
+    `me = object.data.copy(); me.update()`. For a non-MESH object,
+    object.data is not a Mesh (it's a Curve/SurfaceCurve/TextCurve/MetaBall
+    datablock), and none of those types have an update() method - so this
+    raised `AttributeError: 'Curve' object has no attribute 'update'`
+    immediately, breaking every collider operator on such objects. Since
+    my_use_modifier_stack defaults to False (and use_modifiers is not gated
+    on the object actually having modifiers at this call site - see
+    get_pre_processed_mesh_objs), this fired unconditionally for a plain
+    curve object with default settings, e.g. an imported hair/cable curve
+    with zero modifiers.
+
+    Fix: use bpy.data.meshes.new_from_object(object) instead, mirroring the
+    use_modifiers=True branch (which already used the depsgraph-evaluated
+    form of the same API) but without a depsgraph, which the API docs
+    define as returning the object's undeformed geometry - the correct
+    curve/text/metaball -> mesh conversion.
+
+    SURFACE and META objects share the exact same code path and datablock
+    hierarchy (SurfaceCurve/TextCurve subclass Curve; MetaBall is likewise
+    update()-less) so the fix covers them too, but building minimal valid
+    NURBS-surface geometry from Python without bpy.ops (unavailable in
+    --background mode) is impractical for a unit test - CURVE (the type
+    that triggered the original crash report) and FONT (trivial to build,
+    exercises a different Curve subclass) are exercised directly instead.
+    """
+
+    _PREFIX = '__test_curve2mesh_'
+
+    def setUp(self):
+        self._tmp_objs = []
+        self._obj_names = []
+        self._curve_names = []
+
+    def tearDown(self):
+        for obj in self._tmp_objs:
+            _remove_obj(obj)
+        self._tmp_objs = []
+        for name in self._obj_names:
+            obj = bpy.data.objects.get(name)
+            if obj is not None:
+                bpy.data.objects.remove(obj, do_unlink=True)
+        self._obj_names = []
+        for name in self._curve_names:
+            curve = bpy.data.curves.get(name)
+            if curve is not None:
+                bpy.data.curves.remove(curve)
+        self._curve_names = []
+
+    def _make_curve_obj(self, name):
+        """A simple 2-point Bezier curve with bevel depth, so the resulting
+        mesh has real thickness (vertices/faces), not a degenerate 1D line."""
+        curve = bpy.data.curves.new(name + '_curve', type='CURVE')
+        curve.dimensions = '3D'
+        curve.bevel_depth = 0.05
+        spline = curve.splines.new('BEZIER')
+        spline.bezier_points.add(1)
+        spline.bezier_points[0].co = (0.0, 0.0, 0.0)
+        spline.bezier_points[1].co = (2.0, 0.0, 0.0)
+        for bp in spline.bezier_points:
+            bp.handle_left_type = 'AUTO'
+            bp.handle_right_type = 'AUTO'
+        obj = bpy.data.objects.new(name, curve)
+        bpy.context.scene.collection.objects.link(obj)
+        self._obj_names.append(obj.name)
+        self._curve_names.append(curve.name)
+        return obj
+
+    def _make_font_obj(self, name):
+        font_curve = bpy.data.curves.new(name + '_font', type='FONT')
+        font_curve.body = 'A'
+        obj = bpy.data.objects.new(name, font_curve)
+        bpy.context.scene.collection.objects.link(obj)
+        self._obj_names.append(obj.name)
+        self._curve_names.append(font_curve.name)
+        return obj
+
+    def test_curve_without_modifier_stack_does_not_raise(self):
+        """convert_to_mesh(use_modifiers=False) on a CURVE object - the
+        default state (my_use_modifier_stack defaults to False) - must not
+        raise, and must produce a real Mesh with vertices."""
+        curve_obj = self._make_curve_obj('curve_nomod')
+        spy = _ConvertToMeshSpy()
+        try:
+            new_obj = _OBJECT_OT_add_bounding_object.convert_to_mesh(
+                spy, bpy.context, curve_obj, use_modifiers=False
+            )
+        except AttributeError as exc:
+            self.fail(
+                f"convert_to_mesh(use_modifiers=False) raised on a CURVE "
+                f"object: {type(exc).__name__}: {exc}"
+            )
+        self._tmp_objs.append(new_obj)
+        self.assertIsInstance(new_obj.data, bpy.types.Mesh)
+        self.assertGreater(len(new_obj.data.vertices), 0)
+
+    def test_curve_with_modifier_stack_does_not_raise(self):
+        """convert_to_mesh(use_modifiers=True) on a CURVE object must also
+        work, and must produce the same result as use_modifiers=False when
+        the object has no modifiers to apply."""
+        curve_obj = self._make_curve_obj('curve_withmod')
+        self.assertEqual(len(curve_obj.modifiers), 0)
+        spy = _ConvertToMeshSpy()
+        try:
+            new_obj = _OBJECT_OT_add_bounding_object.convert_to_mesh(
+                spy, bpy.context, curve_obj, use_modifiers=True
+            )
+        except AttributeError as exc:
+            self.fail(
+                f"convert_to_mesh(use_modifiers=True) raised on a CURVE "
+                f"object: {type(exc).__name__}: {exc}"
+            )
+        self._tmp_objs.append(new_obj)
+        self.assertIsInstance(new_obj.data, bpy.types.Mesh)
+        self.assertGreater(len(new_obj.data.vertices), 0)
+
+    def test_font_without_modifier_stack_does_not_raise(self):
+        """Same regression, exercised on a FONT (TextCurve) object."""
+        font_obj = self._make_font_obj('font_nomod')
+        spy = _ConvertToMeshSpy()
+        try:
+            new_obj = _OBJECT_OT_add_bounding_object.convert_to_mesh(
+                spy, bpy.context, font_obj, use_modifiers=False
+            )
+        except AttributeError as exc:
+            self.fail(
+                f"convert_to_mesh(use_modifiers=False) raised on a FONT "
+                f"object: {type(exc).__name__}: {exc}"
+            )
+        self._tmp_objs.append(new_obj)
+        self.assertIsInstance(new_obj.data, bpy.types.Mesh)
+        self.assertGreater(len(new_obj.data.vertices), 0)
+
+
 # -- _PostprocessingFake ------------------------------------------------------
 
 
