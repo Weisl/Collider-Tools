@@ -401,6 +401,122 @@ class TestConvertToMeshNonMeshTypes(unittest.TestCase):
         self.assertGreater(len(new_obj.data.vertices), 0)
 
 
+# -- convert_to_mesh: EMPTY source objects (#677) -----------------------------
+
+
+class TestConvertToMeshEmptyObjects(unittest.TestCase):
+    """An EMPTY has no mesh data of its own - unlike CURVE/SURFACE/FONT/META
+    (see TestConvertToMeshNonMeshTypes above) it has no "undeformed" fallback
+    geometry either, so bpy.data.meshes.new_from_object() always raises
+    "Object does not have geometry data" for it, evaluated or not - regardless
+    of use_modifiers. convert_to_mesh() must route EMPTY through the
+    depsgraph-instance path (merge_object_instances(), the same mechanism an
+    unrealized Geometry Nodes "Instance on Points" output already uses)
+    instead, starting from a blank mesh rather than calling new_from_object()
+    on the EMPTY itself.
+
+    Since Blender 5.2, an EMPTY can carry a Geometry Nodes modifier whose
+    output surfaces as a depsgraph instance parented to it (not as the
+    EMPTY's own evaluated data) - see the gated tests below, which build a
+    real modifier to exercise that path end to end. Adding modifiers to an
+    EMPTY isn't possible before 5.2 (obj.modifiers.new() silently returns
+    None there), so a bare EMPTY with zero modifiers is used for the
+    version-independent crash regression instead.
+    """
+
+    _PREFIX = '__test_empty2mesh_'
+
+    def setUp(self):
+        self._tmp_objs = []
+        self._obj_names = []
+        self._node_group_names = []
+
+    def tearDown(self):
+        for obj in self._tmp_objs:
+            _remove_obj(obj)
+        self._tmp_objs = []
+        for name in self._obj_names:
+            obj = bpy.data.objects.get(name)
+            if obj is not None:
+                bpy.data.objects.remove(obj, do_unlink=True)
+        self._obj_names = []
+        for name in self._node_group_names:
+            group = bpy.data.node_groups.get(name)
+            if group is not None:
+                bpy.data.node_groups.remove(group)
+        self._node_group_names = []
+
+    def _make_empty(self, name):
+        empty = bpy.data.objects.new(name, None)
+        bpy.context.scene.collection.objects.link(empty)
+        self._obj_names.append(empty.name)
+        return empty
+
+    def _make_gn_cube_empty(self, name):
+        """An Empty with a Geometry Nodes modifier producing a unit cube
+        (8 verts) - only possible on Blender 5.2+, callers gate accordingly."""
+        empty = self._make_empty(name)
+        node_group = bpy.data.node_groups.new(name + '_nodes', 'GeometryNodeTree')
+        self._node_group_names.append(node_group.name)
+        node_group.interface.new_socket(name='Geometry', in_out='OUTPUT', socket_type='NodeSocketGeometry')
+        group_output = node_group.nodes.new('NodeGroupOutput')
+        cube_node = node_group.nodes.new('GeometryNodeMeshCube')
+        node_group.links.new(cube_node.outputs['Mesh'], group_output.inputs['Geometry'])
+
+        mod = empty.modifiers.new(name='GeometryNodes', type='NODES')
+        mod.node_group = node_group
+        return empty
+
+    def test_bare_empty_without_modifier_stack_does_not_raise(self):
+        """convert_to_mesh(use_modifiers=False) on a plain EMPTY with no
+        modifiers - the default state (my_use_modifier_stack defaults to
+        False) - must not raise, and must produce a real (0-vertex) Mesh
+        rather than crashing on new_from_object()'s "no geometry data" error."""
+        empty_obj = self._make_empty(self._PREFIX + 'bare')
+        spy = _ConvertToMeshSpy()
+        try:
+            new_obj = _OBJECT_OT_add_bounding_object.convert_to_mesh(
+                spy, bpy.context, empty_obj, use_modifiers=False
+            )
+        except RuntimeError as exc:
+            self.fail(
+                f"convert_to_mesh(use_modifiers=False) raised on a bare "
+                f"EMPTY object: {type(exc).__name__}: {exc}"
+            )
+        self._tmp_objs.append(new_obj)
+        self.assertIsInstance(new_obj.data, bpy.types.Mesh)
+        self.assertEqual(len(new_obj.data.vertices), 0)
+
+    @unittest.skipUnless(bpy.app.version >= (5, 2, 0), "EMPTY modifiers require Blender 5.2+")
+    def test_gn_empty_with_modifier_stack_produces_geometry(self):
+        """use_modifiers=True on an EMPTY with a Geometry Nodes modifier must
+        pull the modifier's output mesh (the "activated" case, #677)."""
+        empty_obj = self._make_gn_cube_empty(self._PREFIX + 'gn_on')
+        spy = _ConvertToMeshSpy()
+        new_obj = _OBJECT_OT_add_bounding_object.convert_to_mesh(
+            spy, bpy.context, empty_obj, use_modifiers=True
+        )
+        self._tmp_objs.append(new_obj)
+        self.assertIsInstance(new_obj.data, bpy.types.Mesh)
+        self.assertEqual(len(new_obj.data.vertices), 8)
+
+    @unittest.skipUnless(bpy.app.version >= (5, 2, 0), "EMPTY modifiers require Blender 5.2+")
+    def test_gn_empty_without_modifier_stack_has_no_geometry(self):
+        """use_modifiers=False on an EMPTY with a Geometry Nodes modifier
+        must not raise and must yield a 0-vertex mesh, mirroring "no valid
+        collision until the modifier is activated" (#677) - the modifier's
+        show_viewport is forced off, so the depsgraph never evaluates it and
+        no instance is produced for merge_object_instances() to collect."""
+        empty_obj = self._make_gn_cube_empty(self._PREFIX + 'gn_off')
+        spy = _ConvertToMeshSpy()
+        new_obj = _OBJECT_OT_add_bounding_object.convert_to_mesh(
+            spy, bpy.context, empty_obj, use_modifiers=False
+        )
+        self._tmp_objs.append(new_obj)
+        self.assertIsInstance(new_obj.data, bpy.types.Mesh)
+        self.assertEqual(len(new_obj.data.vertices), 0)
+
+
 # -- _PostprocessingFake ------------------------------------------------------
 
 

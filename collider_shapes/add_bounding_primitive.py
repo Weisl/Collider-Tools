@@ -1801,7 +1801,12 @@ class OBJECT_OT_add_bounding_object():
         # for use_modifiers=True - the base object's modifier stack doesn't
         # change between drag deltas, so reuse the last bake instead of
         # re-evaluating the whole scene's depsgraph on every MOUSEMOVE (#631).
-        cache_key = (object, use_modifiers) if use_modifiers else None
+        # An EMPTY has no undeformed geometry of its own (object.data is
+        # always None) - its only possible geometry comes from its modifier
+        # stack (Geometry Nodes, Blender 5.2+) - so it always bakes via the
+        # evaluated-depsgraph branch below, regardless of use_modifiers.
+        bake_via_depsgraph = use_modifiers or object.type == 'EMPTY'
+        cache_key = (object, use_modifiers) if bake_via_depsgraph else None
         cached_mesh = self._modifier_bake_cache.get(cache_key) if cache_key else None
 
         if cached_mesh is not None and cached_mesh.name in bpy.data.meshes:
@@ -1813,24 +1818,36 @@ class OBJECT_OT_add_bounding_object():
                 mod.show_viewport = use_modifiers
                 mod.show_in_editmode = use_modifiers
 
-            if use_modifiers:
+            if bake_via_depsgraph:
                 deg = context.evaluated_depsgraph_get()
-                me = bpy.data.meshes.new_from_object(object.evaluated_get(deg), depsgraph=deg)
-
                 bm = bmesh.new()
-                bm.from_mesh(me)
+                if object.type == 'EMPTY':
+                    # An EMPTY never has mesh data of its own - new_from_object()
+                    # always raises "Object does not have geometry data" for it,
+                    # evaluated or not, even when its modifier stack (Geometry
+                    # Nodes, Blender 5.2+) is producing geometry. That geometry
+                    # only shows up as a depsgraph instance parented to this
+                    # object (the same mechanism an "Instance on Points" node
+                    # uses), which merge_object_instances() below already
+                    # collects - so start from a blank mesh and let it do the
+                    # work instead of calling new_from_object() on the EMPTY.
+                    me = bpy.data.meshes.new(object.name + "_mesh")
+                else:
+                    me = bpy.data.meshes.new_from_object(object.evaluated_get(deg), depsgraph=deg)
+                    bm.from_mesh(me)
                 self.merge_object_instances(bm, object, deg)
                 bm.to_mesh(me)
                 bm.free()
             else:
                 # Create mesh from undeformed (no modifiers applied) geometry.
                 # object.data is not itself a Mesh for non-MESH types (CURVE/
-                # SURFACE/FONT/META - the only types convert_to_mesh() is ever
-                # called for, see get_pre_processed_mesh_objs()), so it can't
-                # just be copied like a mesh's data can - new_from_object()
-                # does the actual curve/surface/font/meta -> mesh conversion.
-                # Passing no depsgraph is what gives the undeformed geometry
-                # (see its docstring), mirroring the evaluated call above.
+                # SURFACE/FONT/META - the only types that reach this branch,
+                # since EMPTY is always routed through bake_via_depsgraph
+                # above), so it can't just be copied like a mesh's data can -
+                # new_from_object() does the actual curve/surface/font/meta
+                # -> mesh conversion. Passing no depsgraph is what gives the
+                # undeformed geometry (see its docstring), mirroring the
+                # evaluated call above.
                 me = bpy.data.meshes.new_from_object(object)
 
             self.restore_obj_mod_from_dic(mods)

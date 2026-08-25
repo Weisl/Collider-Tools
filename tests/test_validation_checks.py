@@ -683,15 +683,27 @@ class TestPrefsDependentChecks(unittest.TestCase):
         self.assertIsNone(issue)
 
     def test_parent_hierarchy_flagged_invalid_parent_type(self):
-        # An EMPTY isn't in VALID_OBJECT_TYPES ({'MESH','CURVE','SURFACE',
-        # 'FONT','META'}), so parenting a collider to one should be flagged
-        # even though it's neither "no parent" nor "parent is a collider".
+        # A CAMERA isn't in VALID_OBJECT_TYPES ({'MESH','CURVE','SURFACE',
+        # 'FONT','META'} plus 'EMPTY' on Blender 5.2+ - see constants.py), so
+        # parenting a collider to one should be flagged even though it's
+        # neither "no parent" nor "parent is a collider".
+        camera_parent = bpy.data.objects.new(_TEST_PREFIX + 'camera_parent', bpy.data.cameras.new(_TEST_PREFIX + 'cam'))
+        bpy.context.collection.objects.link(camera_parent)
+        collider = _add_collider(_TEST_PREFIX + 'UBX_Thing_001', parent=camera_parent)
+        issue = _checks.check_parent_hierarchy(collider, use_parent_to=True)
+        self.assertIsNotNone(issue)
+        self.assertEqual(issue.check_id, 'parent_hierarchy')
+
+    @unittest.skipUnless(bpy.app.version >= (5, 2, 0), "EMPTY only became a valid parent type on Blender 5.2+")
+    def test_parent_hierarchy_pass_with_empty_parent(self):
+        # An EMPTY is a valid parent type on Blender 5.2+ - it can carry
+        # geometry via a Geometry Nodes modifier there, so a collider
+        # generated from one and parented to it must not be flagged (#677).
         empty_parent = bpy.data.objects.new(_TEST_PREFIX + 'empty_parent', None)
         bpy.context.collection.objects.link(empty_parent)
         collider = _add_collider(_TEST_PREFIX + 'UBX_Thing_001', parent=empty_parent)
         issue = _checks.check_parent_hierarchy(collider, use_parent_to=True)
-        self.assertIsNotNone(issue)
-        self.assertEqual(issue.check_id, 'parent_hierarchy')
+        self.assertIsNone(issue)
 
     # -- parent_inverse_matrix -----------------------------------------------
 
