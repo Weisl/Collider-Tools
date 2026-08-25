@@ -932,6 +932,105 @@ class TestCustomSetParentPreservesTransform(unittest.TestCase):
             )
 
 
+class TestColliderCopyFromParentedSourcePreservesWorldTransform(unittest.TestCase):
+    """Regression guard for issue #676: Mesh/Remesh colliders generated from a
+    parented source object ended up offset from the source geometry.
+
+    add_collision_mesh.py / add_collision_remesh.py build new_collider via
+    OBJECT_OT_add_bounding_object.copy_object_as_collider(), which wraps
+    `obj.copy()`. Unlike every other collider shape (which builds a fresh
+    object via bpy.data.objects.new()), obj.copy() inherits the source
+    object's existing parent and matrix_parent_inverse. custom_set_parent()
+    rebuilds the child's world matrix from location/rotation_euler/scale,
+    which are only equal to world-space values when the child has no parent
+    yet.
+
+    Pre-fix: new_collider kept the source's inherited parent, so
+    custom_set_parent() misread the source's parent-relative location as a
+    world-space location, placing the collider at the wrong position whenever
+    the source object is itself parented to something with a non-identity
+    transform (exactly the Plane_013 / mountains_parking_loc scene from #676).
+
+    Post-fix: copy_object_as_collider() clears new_collider.parent (and
+    resets matrix_parent_inverse to identity) immediately after obj.copy(),
+    before matrix_world is set or custom_set_parent() runs, so the
+    world-space assumption holds. This test calls the real production
+    helper directly, so reverting the fix in copy_object_as_collider()
+    makes it fail.
+    """
+
+    _PREFIX = '__test_676_'
+
+    def setUp(self):
+        self._obj_names = []
+
+    def tearDown(self):
+        for name in self._obj_names:
+            obj = bpy.data.objects.get(name)
+            if obj is not None:
+                data = obj.data
+                bpy.data.objects.remove(obj, do_unlink=True)
+                if isinstance(data, bpy.types.Mesh):
+                    mesh = bpy.data.meshes.get(data.name)
+                    if mesh is not None:
+                        bpy.data.meshes.remove(mesh)
+
+    def test_collider_matches_source_world_transform_when_source_is_parented(self):
+        # Two-level parent chain with non-identity transforms, mirroring
+        # city_wall_offset -> mountains_parking_loc -> Plane_013 from #676.
+        grandparent = bpy.data.objects.new(self._PREFIX + 'grandparent', None)
+        grandparent.location = (40.0, -12.0, 3.0)
+        grandparent.rotation_euler = (0.0, 0.0, 0.7)
+        bpy.context.scene.collection.objects.link(grandparent)
+        self._obj_names.append(grandparent.name)
+
+        parent = bpy.data.objects.new(self._PREFIX + 'parent', None)
+        parent.parent = grandparent
+        parent.location = (20.0, 5.0, -1.0)
+        bpy.context.scene.collection.objects.link(parent)
+        self._obj_names.append(parent.name)
+
+        source = _make_tri_obj(self._PREFIX + 'source')
+        source.parent = parent
+        source.location = (67.8, -307.2, 0.3)  # parent-relative, not world-space
+        source.rotation_euler = (0.0, 0.0, 1.84)
+        source.scale = (6.17, 6.17, 6.17)
+        self._obj_names.append(source.name)
+
+        bpy.context.view_layer.update()
+        source_world = source.matrix_world.copy()
+
+        # Same object-creation call add_collision_mesh.py / add_collision_remesh.py
+        # make: mesh_from_selection() output is irrelevant here, so reuse source's data.
+        new_mesh = source.data.copy()
+        new_collider = _OBJECT_OT_add_bounding_object.copy_object_as_collider(
+            source, new_mesh
+        )
+        new_collider.name = self._PREFIX + 'collider'
+        self._obj_names.append(new_collider.name)
+
+        bpy.context.scene.collection.objects.link(new_collider)
+        new_collider.matrix_world = source_world
+
+        _OBJECT_OT_add_bounding_object.custom_set_parent(
+            bpy.context, source, new_collider
+        )
+        bpy.context.view_layer.update()
+
+        result_world = new_collider.matrix_world
+        for i in range(4):
+            for j in range(4):
+                self.assertAlmostEqual(
+                    source_world[i][j], result_world[i][j], places=4,
+                    msg=(
+                        f"matrix_world[{i}][{j}] diverged from the source's world "
+                        f"transform: {source_world[i][j]:.6f} -> {result_world[i][j]:.6f}. "
+                        "new_collider likely still carries the source's inherited "
+                        "parent into custom_set_parent()."
+                    ),
+                )
+
+
 # -- fix_inverse_matrix: batch update support ---------------------------------
 
 _fix_inverse_matrix = _addon.collider_operators.utility_operators.fix_inverse_matrix

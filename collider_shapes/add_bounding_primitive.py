@@ -1128,6 +1128,27 @@ class OBJECT_OT_add_bounding_object():
         child.matrix_parent_inverse = parent.matrix_world.inverted()
         child.matrix_world = mtx
 
+    @staticmethod
+    def copy_object_as_collider(obj, new_mesh):
+        """Copy obj into a new collider object carrying new_mesh as its data.
+
+        obj.copy() inherits obj's existing parent and matrix_parent_inverse.
+        Unlike every other collider shape (which builds new_collider from
+        scratch via bpy.data.objects.new(), so it starts unparented),
+        Mesh/Remesh colliders start from a copy of the source object. If that
+        inherited parent isn't cleared here, the later custom_set_parent()
+        call - which rebuilds the child's world matrix from
+        location/rotation_euler/scale - misreads those as world-space values
+        when they are actually relative to the inherited parent, placing the
+        collider at the wrong position whenever the source object is itself
+        parented to something (see issue #676).
+        """
+        new_collider = obj.copy()
+        new_collider.data = new_mesh
+        new_collider.parent = None
+        new_collider.matrix_parent_inverse = Matrix.Identity(4)
+        return new_collider
+
     @classmethod
     def bmesh(cls, bm):
         # append bmesh to class for it not to be deleted

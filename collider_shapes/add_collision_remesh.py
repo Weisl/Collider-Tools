@@ -81,8 +81,7 @@ class OBJECT_OT_add_remesh_collision(OBJECT_OT_add_bounding_object, Operator):
 
             else:  # self.obj_mode  == "OBJECT" or self.use_loose_mesh == True:
                 new_mesh = self.mesh_from_selection(obj, use_modifiers=self.my_use_modifier_stack)
-                new_collider = obj.copy()
-                new_collider.data = new_mesh
+                new_collider = self.copy_object_as_collider(obj, new_mesh)
 
             if new_mesh is None:
                 continue

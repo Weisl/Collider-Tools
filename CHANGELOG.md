@@ -11,7 +11,7 @@ are added as a new section above the previous one — existing entries are
 never overwritten, so this file (like the docs page) accumulates the full
 release history over time.
 
-## Simple Collider v1.2.1 (Unreleased)
+## Simple Collider v1.2.1 (2026-08-17)
 
 Minor bug fix release.
 
