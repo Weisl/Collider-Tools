@@ -2249,8 +2249,14 @@ class OBJECT_OT_add_bounding_object():
 
         if event.type in {'RET', 'NUMPAD_ENTER'}:
             self.confirm_numeric_input(context, event)
+            # swallow this keystroke's RELEASE so it doesn't also finish the
+            # whole operator via the generic RET/NUMPAD_ENTER handling below
+            self.numeric_input_swallow_release = event.type
         elif event.type == 'ESC':
             self.cancel_numeric_input(event)
+            # swallow this keystroke's RELEASE so it doesn't also cancel the
+            # whole operator via the generic ESC handling below
+            self.numeric_input_swallow_release = event.type
         elif event.type == 'BACK_SPACE':
             if self.numeric_input_str:
                 self.numeric_input_str = self.numeric_input_str[:-1]
@@ -2523,6 +2529,15 @@ class OBJECT_OT_add_bounding_object():
         self.numeric_input_active = False
         self.numeric_input_str = ''
         self.numeric_input_field = None
+        # RET/NUMPAD_ENTER/ESC confirm or cancel typed entry on their PRESS
+        # event (see handle_numeric_input). Blender still delivers the
+        # matching RELEASE of that same keystroke afterwards, and since it
+        # arrives once numeric_input_active is already False, it would
+        # otherwise fall through to the finish/cancel-operator handling
+        # further down in modal() - one keypress both confirming the typed
+        # value and immediately ending the whole operator (issue #679).
+        # This remembers which event.type's next RELEASE to swallow.
+        self.numeric_input_swallow_release = None
 
         # Display settings
         self.color_type = context.space_data.shading.color_type
@@ -2599,6 +2614,22 @@ class OBJECT_OT_add_bounding_object():
 
     def modal(self, context, event):
         colSettings = context.scene.simple_collider
+
+        # See numeric_input_swallow_release: a RET/NUMPAD_ENTER/ESC keystroke
+        # that was already handled as a confirm/cancel of typed numeric entry
+        # (on its first PRESS) must not also reach the finish/cancel-operator
+        # handling below via the rest of that same keystroke. That "rest"
+        # isn't just one RELEASE event - holding the key down makes Blender
+        # resend PRESS as key-repeat for as long as it's held, with the
+        # RELEASE only arriving once it's actually let go. So every event of
+        # the armed type is swallowed here, and only a matching RELEASE
+        # disarms it; anything else (mouse move, a different key) passes
+        # through untouched and leaves it armed.
+        if self.numeric_input_swallow_release is not None:
+            if event.type == self.numeric_input_swallow_release:
+                if event.value == 'RELEASE':
+                    self.numeric_input_swallow_release = None
+                return {'RUNNING_MODAL'}
 
         # Ignore if Alt is pressed
         if event.alt:
